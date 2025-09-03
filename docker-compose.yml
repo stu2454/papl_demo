@@ -1,0 +1,34 @@
+
+services:
+  # one-off ingestion job (chunk + ingest)
+  ingest:
+    build: .
+    image: papl-copilot:latest
+    command: >
+      bash -lc "
+      python scripts/chunk_pdf.py --config config.yaml &&
+      python scripts/ingest_papl.py --config config.yaml
+      "
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PYTHONWARNINGS=ignore
+
+  # streamlit app
+  app:
+    build: .
+    image: papl-copilot:latest
+    command: >
+      bash -lc "
+      streamlit run app/streamlit_app.py
+      --server.port=8520 --server.address=0.0.0.0
+      "
+    ports:
+      - "8520:8520"
+    volumes:
+      - ./data:/app/data
+    environment:
+      #- STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+      #- PYTHONWARNINGS=ignore
+      # Optionally uncomment and set in an .env file or your shell:
+       - OPENAI_API_KEY=${OPENAI_API_KEY}

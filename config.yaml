@@ -1,0 +1,8 @@
+papl_version: "2025-26"
+pdf_path: "data/PAPL2025-2026.pdf"
+collection_name: "papl_chunks"
+persist_dir: "data/chroma"
+chunk_chars: 1800
+chunk_overlap: 220
+max_chunks: 0
+section_map_csv: ""
