@@ -1,4 +1,4 @@
-# app/streamlit_app.py
+# app/streamlit_app.py — Cloud-stable drop-in
 import os, sys
 import streamlit as st
 import pandas as pd
@@ -6,7 +6,6 @@ from PyPDF2 import PdfReader
 
 # ---- Disable file watcher (Cloud inotify fix) ----
 os.environ["STREAMLIT_SERVER_FILEWATCHER_TYPE"] = "none"
-#st.set_option("server.fileWatcherType", "none")
 
 # ---- sqlite3 >=3.35 shim BEFORE importing chromadb ----
 try:
@@ -33,15 +32,10 @@ def pick_writable_dir(candidates):
             return d
         except Exception:
             continue
-    raise RuntimeError(
-        "No writable directory found for Chroma persistence. Tried: "
-        + ", ".join([c for c in candidates if c])
-    )
+    raise RuntimeError("No writable directory found for Chroma persistence. Tried: " + ", ".join([c for c in candidates if c]))
 
 # Prefer CHROMA_DIR (if set), then /mount/data/chroma (persistent on Cloud), then /tmp/chroma
-PERSIST_DIR = pick_writable_dir(
-    [os.environ.get("CHROMA_DIR", ""), "/mount/data/chroma", "/tmp/chroma"]
-)
+PERSIST_DIR = pick_writable_dir([os.environ.get("CHROMA_DIR", ""), "/mount/data/chroma", "/tmp/chroma"])
 
 CFG = {
     "persist_dir": PERSIST_DIR,
@@ -54,8 +48,7 @@ CFG = {
 }
 
 # ---- Styles ----
-st.markdown(
-    f"""
+st.markdown(f"""
 <style>
 .block-container {{ max-width: {CFG["max_width_px"]}px; padding-top: .5rem; padding-bottom: 3rem; }}
 html, body, [class*='css'] {{ font-size: 18px !important; line-height: 1.6 !important; color: #222 !important; }}
@@ -66,25 +59,19 @@ html, body, [class*='css'] {{ font-size: 18px !important; line-height: 1.6 !impo
   .answer-box, .result-card {{ background:#121417; border-color:#2a2f36; color:#eaeef2; }}
 }}
 </style>
-""",
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
 # ---- OpenAI client (secrets + env; v1 and legacy 0.x) ----
-OPENAI_KEY = os.getenv("OPENAI_API_KEY") or (
-    getattr(st, "secrets", {}).get("OPENAI_API_KEY") if hasattr(st, "secrets") else None
-)
+OPENAI_KEY = os.getenv("OPENAI_API_KEY") or (getattr(st, "secrets", {}).get("OPENAI_API_KEY") if hasattr(st, "secrets") else None)
 OPENAI_MODE, oai_client = None, None
 if OPENAI_KEY:
     try:
         from openai import OpenAI
-
         oai_client = OpenAI()
         OPENAI_MODE = "v1"
     except Exception:
         try:
             import openai as _openai
-
             _openai.api_key = OPENAI_KEY
             oai_client = _openai
             OPENAI_MODE = "v0"
@@ -126,7 +113,6 @@ def split_chunks(text: str, chunk_chars=1800, overlap=220):
         start = max(0, start + cut - overlap)
     return chunks
 
-
 def ingest_now():
     if not OPENAI_KEY:
         st.error("OPENAI_API_KEY missing. Add it in Streamlit Cloud → Settings → Secrets.")
@@ -135,9 +121,7 @@ def ingest_now():
         st.error(f"PDF not found at {CFG['pdf_path']}. Commit it to the repo.")
         return False
 
-    ef = embedding_functions.OpenAIEmbeddingFunction(
-        api_key=OPENAI_KEY, model_name="text-embedding-3-small"
-    )
+    ef = embedding_functions.OpenAIEmbeddingFunction(api_key=OPENAI_KEY, model_name="text-embedding-3-small")
     reader = PdfReader(CFG["pdf_path"])
     ids, docs, metas = [], [], []
     doc_id = 0
@@ -147,13 +131,8 @@ def ingest_now():
         if not txt:
             continue
         for j, piece in enumerate(split_chunks(txt), start=1):
-            meta = {
-                "papl_version": CFG["default_version"],
-                "page": i + 1,
-                "section_title": "",
-                "clause_ref": "",
-                "source_pdf_path": CFG["pdf_path"],
-            }
+            meta = {"papl_version": CFG["default_version"], "page": i+1,
+                    "section_title": "", "clause_ref": "", "source_pdf_path": CFG["pdf_path"]}
             ids.append(f"p{i+1}_c{j}_{doc_id}")
             docs.append(piece)
             metas.append(meta)
@@ -166,7 +145,6 @@ def ingest_now():
     st.success(f"Ingested {len(ids)} chunks into collection '{CFG['collection_name']}'.")
     return True
 
-
 def retrieve(query: str, version: str, top_k: int = 12):
     res = col.query(query_texts=[query], n_results=top_k, where={"papl_version": version})
     docs = res.get("documents", [[]])[0]
@@ -174,22 +152,19 @@ def retrieve(query: str, version: str, top_k: int = 12):
     dists = res.get("distances", [[]])[0] or []
     rows = []
     for i, (d, m) in enumerate(zip(docs, metas)):
-        rows.append(
-            {
-                "rank": i + 1,
-                "score": dists[i] if i < len(dists) else None,
-                "preview": (d[:360] + "…") if len(d) > 360 else d,
-                "page": m.get("page"),
-                "section": m.get("section_title", ""),
-                "clause_ref": m.get("clause_ref", ""),
-                "papl_version": m.get("papl_version", ""),
-                "pdf": m.get("source_pdf_path", ""),
-                "full_text": d,
-                "_meta": m,
-            }
-        )
+        rows.append({
+            "rank": i + 1,
+            "score": dists[i] if i < len(dists) else None,
+            "preview": (d[:360] + "…") if len(d) > 360 else d,
+            "page": m.get("page"),
+            "section": m.get("section_title", ""),
+            "clause_ref": m.get("clause_ref", ""),
+            "papl_version": m.get("papl_version", ""),
+            "pdf": m.get("source_pdf_path", ""),
+            "full_text": d,
+            "_meta": m,
+        })
     return rows
-
 
 def answer_with_llm(question: str, ctx_blocks):
     if oai_client is None:
@@ -203,26 +178,21 @@ def answer_with_llm(question: str, ctx_blocks):
         if OPENAI_MODE == "v1":
             resp = oai_client.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": user},
-                ],
+                messages=[{"role": "system", "content": SYSTEM_PROMPT},
+                          {"role": "user", "content": user}],
                 temperature=0,
             )
             return resp.choices[0].message.content
         resp = oai_client.ChatCompletion.create(
             model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user},
-            ],
+            messages=[{"role": "system", "content": SYSTEM_PROMPT},
+                      {"role": "user", "content": user}],
             temperature=0,
         )
         return resp["choices"][0]["message"]["content"]
     except Exception as e:
         st.error(f"LLM call failed: {e}")
         return None
-
 
 # ---------------- UI ----------------
 st.title("NDIS PAPL — Cloud Q&A Demo")
@@ -240,10 +210,7 @@ if _empty_index:
     st.warning("Vector index empty. Click **Build index now** to ingest the PAPL PDF.")
     if st.button("Build index now"):
         if ingest_now():
-            try:
-                st.rerun()
-            except Exception:
-                st.experimental_rerun()
+            st.rerun()  # <-- ONLY use st.rerun()
 
 q = st.text_input("Ask a question", placeholder="Type your question and press Enter…")
 if q:
@@ -259,5 +226,5 @@ if q:
         else:
             st.info("Local mode (no API key set): showing top sources only.")
         st.markdown("### Sources")
-        for i, r in enumerate(rows[:CFG["ctx_k"]]):
+        for i, r in enumerate(rows[:CFG["ctx_k"]]):  # simple list for Cloud
             st.markdown(f"- **p.{r['page']}** {r['preview']}")
