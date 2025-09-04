@@ -200,7 +200,11 @@ except Exception:
 if _empty_index:
     st.warning("Vector index empty. Click **Build index now** to ingest the PAPL PDF.")
     if st.button("Build index now"):
-        if ingest_now(): st.experimental_rerun()
+        if ingest_now():
+            try:
+                st.rerun()  # Streamlit >=1.27
+            except Exception:
+                st.experimental_rerun()  # fallback for older
 
 q = st.text_input("Ask a question", placeholder="Type your question and press Enter…")
 if q:
