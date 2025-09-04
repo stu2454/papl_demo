@@ -15,6 +15,9 @@ from chromadb.utils import embedding_functions
 
 st.set_page_config(page_title="PAPL Copilot — Cloud Demo", layout="wide")
 
+os.environ["STREAMLIT_SERVER_FILEWATCHER_TYPE"] = "none"
+st.set_option("server.fileWatcherType", "none")
+
 def pick_writable_dir(candidates):
     for d in candidates:
         if not d:
