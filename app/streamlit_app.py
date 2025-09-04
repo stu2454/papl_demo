@@ -1,7 +1,17 @@
 import os
+import sys
 import pandas as pd
 import streamlit as st
 from PyPDF2 import PdfReader
+
+# --- Ensure modern sqlite3 via pysqlite3 before importing chromadb ---
+try:
+    import pysqlite3  # type: ignore
+    sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
+except Exception:
+    # If pysqlite3 isn't available, chromadb may raise; make sure it's in requirements.txt
+    pass
+
 import chromadb
 from chromadb.config import Settings
 from chromadb.utils import embedding_functions
@@ -70,7 +80,7 @@ Rules:
 """
 
 # -------------------------------------------------
-# Chroma (v0.4.x, DuckDB+Parquet)
+# Chroma (v0.4.x, DuckDB+Parquet) — Cloud-friendly
 # -------------------------------------------------
 @st.cache_resource
 def get_collection():
@@ -180,9 +190,9 @@ def answer_with_llm(question: str, ctx_blocks):
 st.title("NDIS PAPL — Cloud Q&A Demo")
 st.caption("Non-authoritative prototype. Verify in the official PAPL before use.")
 
-# Check index status
+# Check index status (best-effort peek)
 try:
-    _peek = col.get(ids=["dummy"])  # hacky peek
+    _peek = col.get(ids=["__healthcheck__"])
     _empty_index = not _peek or not _peek.get("ids")
 except Exception:
     _empty_index = True
@@ -206,5 +216,5 @@ if q:
         else:
             st.info("Local mode (no API key set): showing top sources only.")
         st.markdown("### Sources")
-        for i, r in enumerate(rows[:CFG["ctx_k"]]):
+        for i, r in enumerate(rows[:CFG["ctx_k"]]):  # simple list for Cloud
             st.markdown(f"- **p.{r['page']}** {r['preview']}")
