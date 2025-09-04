@@ -6,7 +6,7 @@ from PyPDF2 import PdfReader
 
 # ---- Disable file watcher (Cloud inotify fix) ----
 os.environ["STREAMLIT_SERVER_FILEWATCHER_TYPE"] = "none"
-st.set_option("server.fileWatcherType", "none")
+#st.set_option("server.fileWatcherType", "none")
 
 # ---- sqlite3 >=3.35 shim BEFORE importing chromadb ----
 try:
