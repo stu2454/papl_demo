@@ -11,7 +11,6 @@ except Exception:
     pass
 
 import chromadb
-from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 
 st.set_page_config(page_title="PAPL Copilot — Cloud Demo", layout="wide")
@@ -29,10 +28,9 @@ def pick_writable_dir(candidates):
             return d
         except Exception:
             continue
-    # last resort: raise to show a clear error
     raise RuntimeError("No writable directory found for Chroma persistence. Tried: " + ", ".join([c for c in candidates if c]))
 
-# Prefer CHROMA_DIR (if set), then /mount/data/chroma (Streamlit Cloud persistent storage), then /tmp/chroma
+# Prefer CHROMA_DIR (if set), then /mount/data/chroma (persistent on Cloud), then /tmp/chroma
 PERSIST_DIR = pick_writable_dir([os.environ.get("CHROMA_DIR", ""), "/mount/data/chroma", "/tmp/chroma"])
 
 CFG = {
@@ -45,6 +43,7 @@ CFG = {
     "max_width_px": 1200,
 }
 
+# ---- Styles ----
 st.markdown(f"""
 <style>
 .block-container {{ max-width: {CFG["max_width_px"]}px; padding-top: .5rem; padding-bottom: 3rem; }}
@@ -58,7 +57,7 @@ html, body, [class*='css'] {{ font-size: 18px !important; line-height: 1.6 !impo
 </style>
 """, unsafe_allow_html=True)
 
-# OpenAI client (env/secrets; v1 or legacy)
+# ---- OpenAI client (secrets + env; v1 and legacy 0.x) ----
 OPENAI_KEY = os.getenv("OPENAI_API_KEY") or (getattr(st, "secrets", {}).get("OPENAI_API_KEY") if hasattr(st, "secrets") else None)
 OPENAI_MODE, oai_client = None, None
 if OPENAI_KEY:
@@ -85,13 +84,10 @@ Rules:
 5) If the user asks for advice beyond the PAPL’s scope (e.g., clinical, legal, policy positions), respond: "Out of scope for PAPL. Please consult the official guidance."
 """
 
+# ---- Chroma 0.4.x client via PersistentClient (avoids Settings warning) ----
 @st.cache_resource
 def get_collection():
-    client = chromadb.Client(Settings(
-        chroma_db_impl="duckdb+parquet",
-        persist_directory=CFG["persist_dir"],
-        anonymized_telemetry=False
-    ))
+    client = chromadb.PersistentClient(path=CFG["persist_dir"])
     return client.get_or_create_collection(CFG["collection_name"])
 
 col = get_collection()
@@ -110,7 +106,6 @@ def split_chunks(text: str, chunk_chars=1800, overlap=220):
         start = max(0, start + cut - overlap)
     return chunks
 
-from chromadb.utils import embedding_functions
 def ingest_now():
     if not OPENAI_KEY:
         st.error("OPENAI_API_KEY missing. Add it in Streamlit Cloud → Settings → Secrets.")
@@ -160,7 +155,8 @@ def retrieve(query: str, version: str, top_k: int = 12):
     return rows
 
 def answer_with_llm(question: str, ctx_blocks):
-    if not oai_client: return None
+    # If no API key, just return None to show sources only
+    if oai_client is None: return None
     context_text = "\n\n".join(
         f"[Source: {m.get('papl_version','?')} {m.get('clause_ref','')} p.{m.get('page','?')}] {t}"
         for (t, m) in ctx_blocks
@@ -175,8 +171,8 @@ def answer_with_llm(question: str, ctx_blocks):
                 temperature=0,
             )
             return resp.choices[0].message.content
-        import openai as _openai  # legacy client already set in shim path
-        resp = _openai.ChatCompletion.create(
+        # legacy
+        resp = oai_client.ChatCompletion.create(
             model="gpt-4o-mini",
             messages=[{"role": "system", "content": SYSTEM_PROMPT},
                       {"role": "user", "content": user}],
@@ -194,8 +190,10 @@ st.info(f"Chroma dir: {CFG['persist_dir']}")
 
 # Index status
 try:
-    _peek = col.get(ids=["__healthcheck__"])
-    _empty_index = not _peek or not _peek.get("ids")
+    # Try a simple list; if empty, we consider index empty.
+    # PersistentClient doesn't expose 'peek', so we check count via query trick.
+    _probe = col.count() if hasattr(col, "count") else None
+    _empty_index = (_probe == 0) if _probe is not None else False
 except Exception:
     _empty_index = True
 
@@ -218,5 +216,5 @@ if q:
         else:
             st.info("Local mode (no API key set): showing top sources only.")
         st.markdown("### Sources")
-        for i, r in enumerate(rows[:CFG["ctx_k"]]):  # simple list for Cloud
+        for i, r in enumerate(rows[:CFG["ctx_k"]]):
             st.markdown(f"- **p.{r['page']}** {r['preview']}")
