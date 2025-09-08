@@ -197,6 +197,26 @@ def answer_with_llm(question: str, ctx_blocks):
 # ---------------- UI ----------------
 st.title("NDIS PAPL — Cloud Q&A Demo")
 st.caption("Non-authoritative prototype. Verify in the official PAPL before use.")
+st.markdown("""
+### Welcome to the PAPL Copilot
+
+This tool was developed to make the **NDIS Pricing Arrangements and Price Limits (PAPL)** easier to access and use.  
+The official PAPL is a large, technical PDF document. While authoritative, it can be difficult to search and interpret quickly.  
+This app allows you to:
+
+- **Ask questions in plain English** and receive concise answers linked to the PAPL.
+- **See the exact source passages** (with page references) that support the answer.
+- **Rebuild the index** whenever a new version of the PAPL PDF is added.
+
+---
+
+#### How to use the app
+1. If this is your first time running it, click **Build index now** to load the PAPL PDF into the search index.  
+2. Enter a question in the box (e.g. *"What is the price limit for low-cost AT?"*).  
+3. Read the answer and check the cited sources for confirmation.  
+
+⚠️ **Note:** This is a prototype tool. It is not an official source of truth — always confirm important details in the official PAPL PDF.
+""")
 st.info(f"Chroma dir: {CFG['persist_dir']}")
 
 # Index status
