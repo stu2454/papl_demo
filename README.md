@@ -1,127 +1,108 @@
-# PAPL Copilot — Streamlit Q&A Demo
+# NDIS PAPL Copilot — Streamlit Demo
 
-This project demonstrates how the **NDIS Pricing Arrangements and Price Limits (PAPL)** can be transformed from a static PDF into a **searchable, responsive digital assistant**.  
-It uses **Streamlit** for the UI, **ChromaDB** for retrieval, and (optionally) **OpenAI GPT models** for grounded answers.
-
----
-
-## ✨ Features
-
-- **Modern UI**: Clean app bar, sticky search toolbar, dark-mode safe styling.
-- **Free-text Q&A**: Ask questions like *“Explain claiming for support items that have a price limit”*.
-- **Grounded answers**: Outputs short, cited text with references to PAPL pages/clauses.
-- **Sources grid**: See the retrieved passages side by side, with “Open PDF” links.
-- **Sovereign mode**: Works offline with only local embeddings (no API key needed).
-- **Cloud-ready**: Containerised with Docker, deployable to GitHub Codespaces, Render, or Streamlit Cloud.
+A prototype tool that transforms the static **NDIS Pricing Arrangements and Price Limits (PAPL)** PDF into an **accessible, searchable, and intelligent Q&A assistant**.  
+Built with [Streamlit](https://streamlit.io/), [ChromaDB](https://www.trychroma.com/), and [OpenAI](https://platform.openai.com/).
 
 ---
 
-## 📂 Project Layout
+## Background & Rationale
 
-```
-.
-├─ app/
-│  └─ streamlit_app.py       # Main UI (drop-in v3 with contemporary styling)
-├─ scripts/
-│  ├─ chunk_pdf.py           # Chunk the PAPL PDF into overlapping text blocks
-│  └─ ingest_papl.py         # Ingest chunks into a Chroma index
-├─ data/
-│  ├─ NDIS_PAPL_2025-26.pdf  # (add this yourself, from ndis.gov.au)
-│  └─ chroma/                # Persistent vector index (auto-generated)
-├─ prompts/
-│  └─ system_papl.txt        # Strict system prompt (UK English, AUD$, citations)
-├─ config.yaml               # Chunking + index config
-├─ requirements.txt          # Python dependencies
-├─ Dockerfile                # Build the container
-├─ docker-compose.yml        # Run ingestion + app locally
-└─ README.md                 # This file
-```
+The *NDIS Pricing Arrangements and Price Limits (PAPL)* is the central reference for providers, participants, and planners. It sets out the rules, item descriptions, and price caps that govern how supports are funded under the Scheme. While essential, the PAPL is a large, technical, and static PDF document. Users often struggle to locate relevant clauses, interpret pricing limits, and connect information across sections.  
+
+This creates several challenges:
+
+- **Accessibility** – Not all users have the time or expertise to scan through hundreds of pages to find a single rule. People with disability, families, and smaller providers can be disadvantaged if they cannot easily locate key information.  
+- **Responsiveness** – Planners and policy staff often need to answer time-sensitive questions. A static PDF slows down their work and increases the risk of inconsistent interpretations.  
+- **System integrity** – When answers are difficult to find, reliance on informal knowledge, guesswork, or out-of-date advice increases. This undermines consistent decision-making and erodes trust in the Scheme’s governance.  
+
+Transforming the PAPL into a **searchable, interactive, and intelligent tool** addresses these challenges directly. By layering natural-language search and AI-driven question answering on top of the official document:
+
+- Users can **ask questions in plain English** and receive concise, cited answers linked to the authoritative PAPL text.  
+- The system supports **faster, more consistent policy application**, reducing variation in decision-making.  
+- Accessibility is improved, making the PAPL more usable to participants and providers, not just specialists.  
+- Policy staff gain a **living tool** that can evolve toward richer analytics (e.g., usage patterns, frequently asked questions) to inform future PAPL revisions.  
+
+In short, this project demonstrates how a static regulatory document can be re-imagined as an accessible, responsive, and trusted digital service — improving equity, efficiency, and system learning across the NDIS.
 
 ---
 
-## 🚀 Quick Start (Docker)
+## Features
 
-### 1. Clone the repo
-```bash
-git clone https://github.com/your-org/papl-copilot.git
-cd papl-copilot
-```
-
-### 2. Add the PAPL PDF
-Download the official PAPL (e.g., **NDIS Pricing Arrangements and Price Limits 2025-26**) from  
-[NDIS Pricing Arrangements](https://www.ndis.gov.au/providers/pricing-arrangements)  
-and save it as:
-
-```
-data/NDIS_PAPL_2025-26.pdf
-```
-
-### 3. Build the image
-```bash
-docker compose build
-```
-
-### 4. Ingest the PDF into Chroma
-```bash
-docker compose run --rm ingest
-```
-This chunks the PDF and writes a persistent index into `data/chroma/`.
-
-### 5. Run the app
-```bash
-# Optional: export OPENAI_API_KEY=sk-...   # enables GPT answers
-docker compose up app
-```
-
-Open [http://localhost:8520](http://localhost:8520).
+- Uploads and ingests the **PAPL PDF** into a local vector database.  
+- Supports **plain English queries** with semantic search across PAPL clauses.  
+- Uses an **LLM** to generate concise answers with citations back to the source.  
+- Provides a **“Build index now”** button to re-ingest the document.  
+- Runs fully containerised with **Docker** for reproducibility.  
+- Designed for deployment to **Streamlit Cloud** or local testing.
 
 ---
 
-## 🔑 API Key (Optional)
+## Requirements
 
-- If no key is set → **Local/Sovereign mode** (retrieval only, shows top sources).
-- If `OPENAI_API_KEY` is set → uses **`gpt-4o-mini`** to generate grounded answers.
+- Python 3.11  
+- Dependencies (see `requirements.txt`):
+  - `streamlit`
+  - `chromadb==0.4.22`
+  - `duckdb`
+  - `pysqlite3-binary`
+  - `openai`
+  - `PyPDF2`
+  - `pandas`, `numpy`, `PyYAML`
 
-### Local setup
-Provide the key in `.env` (ignored by Git):
-```
-OPENAI_API_KEY=sk-...
-```
-Make sure `.env` is listed in your `.gitignore`.
+---
 
-### Streamlit Cloud setup
-1. Deploy your repo to [Streamlit Cloud](https://streamlit.io/cloud).  
-2. In your app dashboard, go to **Settings → Secrets**.  
-3. Add:
-   ```toml
-   OPENAI_API_KEY="sk-..."
+## Setup
+
+1. Clone the repo:
+   ```bash
+   git clone https://github.com/your-org/papl_demo.git
+   cd papl_demo
    ```
-4. The app will pick it up automatically (via `os.getenv`).  
-No need to commit `.env` — keep that local only.
+
+2. Add the PAPL PDF:
+   ```bash
+   mkdir -p data
+   cp NDIS_PAPL_2025-26.pdf data/
+   ```
+
+3. Create a `.env` file for **local development**:
+   ```bash
+   OPENAI_API_KEY=sk-your-real-key
+   ```
+
+4. For **Streamlit Cloud deployment**, set secrets in **Settings → Secrets**:
+   ```toml
+   OPENAI_API_KEY="sk-your-real-key"
+   CHROMA_DIR="/mount/data/chroma"
+   ```
+
+5. Build and run locally:
+   ```bash
+   docker compose up --build
+   ```
+
+6. Open [http://localhost:8520](http://localhost:8520) in your browser.
 
 ---
 
-## 🛠️ Development (local without Docker)
+## Usage
 
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python scripts/chunk_pdf.py --config config.yaml
-python scripts/ingest_papl.py --config config.yaml
-streamlit run app/streamlit_app.py --server.port=8520
-```
+- On first load, click **Build index now** to ingest the PAPL PDF.  
+- Enter a question in the text box (e.g. *“What is the price limit for low-cost assistive technology?”*).  
+- The tool will return:
+  - A concise answer (if an API key is configured).  
+  - A list of relevant source passages with page numbers.  
 
 ---
 
-## ⚖️ Notes
+## Limitations
 
-- **Non-authoritative**: Always verify results against the official PAPL.
-- **Versioning**: Update `config.yaml` and re-ingest whenever NDIA publishes a new PAPL version.
-- **UI tweaks**: Fonts, colours, and layout can be tuned in the CSS block at the top of `streamlit_app.py`.
-- **Future options**: Replace Streamlit with a React + FastAPI stack for even more polished UI.
+- Prototype only: **not an authoritative source**. Always confirm against the official PAPL PDF.  
+- Accuracy depends on the quality of PDF text extraction and embeddings.  
+- Context length is limited; long or complex queries may truncate context.  
 
 ---
 
-## 📜 License
+## License
 
-MIT (adjust as needed).
+MIT — see [LICENSE](LICENSE).
